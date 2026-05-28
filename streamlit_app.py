@@ -67,7 +67,9 @@ def inject_css() -> None:
         }
 
         .stApp {
-            background: var(--app-bg);
+            background:
+                radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0) 34%),
+                linear-gradient(180deg, #ffffff 0%, var(--app-bg) 42%, #f2f2f4 100%);
             color: var(--ink);
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
         }
@@ -79,7 +81,7 @@ def inject_css() -> None:
         }
 
         [data-testid="stSidebar"] {
-            background: rgba(255, 255, 255, 0.72);
+            background: rgba(255, 255, 255, 0.86);
             border-right: 1px solid var(--line);
             backdrop-filter: blur(18px);
         }
@@ -93,8 +95,8 @@ def inject_css() -> None:
         }
 
         .block-container {
-            max-width: 1180px;
-            padding-top: 42px;
+            max-width: 1120px;
+            padding-top: 54px;
             padding-bottom: 56px;
         }
 
@@ -104,7 +106,7 @@ def inject_css() -> None:
         }
 
         h1 {
-            font-size: 42px;
+            font-size: 48px;
             font-weight: 700;
         }
 
@@ -121,14 +123,14 @@ def inject_css() -> None:
         div[data-testid="stMetric"],
         div[data-testid="stDataFrame"],
         div[data-testid="stExpander"] {
-            background: var(--card-bg);
+            background: rgba(255, 255, 255, 0.92);
             border: 1px solid var(--line);
-            border-radius: 22px;
-            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.05);
+            border-radius: 28px;
+            box-shadow: 0 22px 70px rgba(0, 0, 0, 0.065);
         }
 
         div[data-testid="stForm"] {
-            padding: 24px;
+            padding: 30px;
         }
 
         div[data-testid="stMetric"] {
@@ -169,18 +171,45 @@ def inject_css() -> None:
         .stDownloadButton button,
         button[kind="primary"],
         button[kind="secondary"] {
-            background: var(--blue) !important;
-            color: white !important;
+            background: #0071e3 !important;
+            color: #ffffff !important;
             border: 0 !important;
             border-radius: 999px !important;
-            padding: 0.62rem 1.15rem !important;
-            font-weight: 600 !important;
+            padding: 0.7rem 1.25rem !important;
+            font-weight: 650 !important;
             box-shadow: none !important;
+        }
+
+        .stButton button *,
+        .stDownloadButton button *,
+        button[kind="primary"] *,
+        button[kind="secondary"] * {
+            color: #ffffff !important;
+            opacity: 1 !important;
         }
 
         .stButton button:hover,
         .stDownloadButton button:hover {
             background: #0066cc !important;
+        }
+
+        [data-testid="stSidebar"] .stButton button {
+            background: #1d1d1f !important;
+            color: #ffffff !important;
+            min-height: 42px;
+        }
+
+        [data-testid="stSidebar"] .stButton button * {
+            color: #ffffff !important;
+        }
+
+        [data-testid="stSidebar"] [role="radiogroup"] label {
+            border-radius: 14px;
+            padding: 6px 8px;
+        }
+
+        [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+            background: rgba(0, 0, 0, 0.045);
         }
 
         div[data-testid="stAlert"] {
@@ -194,7 +223,8 @@ def inject_css() -> None:
         }
 
         .app-hero {
-            margin-bottom: 24px;
+            margin-bottom: 32px;
+            text-align: center;
         }
 
         .app-eyebrow {
@@ -206,31 +236,47 @@ def inject_css() -> None:
 
         .app-title {
             color: var(--ink);
-            font-size: 42px;
-            line-height: 1.08;
-            font-weight: 720;
-            margin-bottom: 8px;
+            font-size: clamp(40px, 6vw, 68px);
+            line-height: 1.02;
+            font-weight: 760;
+            margin-bottom: 12px;
         }
 
         .app-subtitle {
             color: var(--muted);
-            font-size: 17px;
+            font-size: clamp(17px, 2.2vw, 22px);
             line-height: 1.45;
-            max-width: 720px;
+            max-width: 760px;
+            margin: 0 auto;
         }
 
         .login-card {
             max-width: 460px;
-            margin: 44px auto 0;
+            margin: 52px auto 0;
         }
 
         .product-pill {
             background: var(--green-bg);
             color: var(--green-text);
-            border-radius: 18px;
-            padding: 18px 20px;
+            border: 1px solid rgba(20, 122, 63, 0.12);
+            border-radius: 22px;
+            padding: 20px 22px;
             font-weight: 600;
             margin-top: 12px;
+        }
+
+        @media (max-width: 760px) {
+            .block-container {
+                padding-top: 32px;
+            }
+
+            .app-hero {
+                text-align: left;
+            }
+
+            .app-title {
+                font-size: 38px;
+            }
         }
         </style>
         """,
