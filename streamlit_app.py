@@ -670,7 +670,7 @@ def record_page(products: pd.DataFrame) -> None:
     ba_today_entries()
 
     if save_flash:
-        time.sleep(1.5)
+        time.sleep(0.8)
         st.session_state.save_flash = False
         st.rerun()
 
@@ -720,22 +720,21 @@ def ba_today_entries() -> None:
         editor_df,
         hide_index=True,
         use_container_width=True,
-        disabled=["last6", "barcode", "product_name", "brand", "category"],
-        column_config={
-            "id": None,
-            "report_date": st.column_config.DateColumn("Date"),
-            "report_type": st.column_config.SelectboxColumn("Type", options=list(REPORT_LABELS.keys())),
-            "ba_name": "BA Name",
-            "last6": "Last6",
-            "barcode": "Full Barcode",
-            "product_name": "Product Name",
-            "brand": "Brand",
-            "qty": st.column_config.NumberColumn("Qty", min_value=1, step=1),
-            "category": "Category",
-            "store_name": "Store",
-            "location": "Location",
-            "notes": "Notes",
-        },
+        column_order=[
+            "report_date",
+            "report_type",
+            "ba_name",
+            "last6",
+            "barcode",
+            "product_name",
+            "brand",
+            "qty",
+            "category",
+            "store_name",
+            "location",
+            "notes",
+        ],
+        disabled=["id", "last6", "barcode", "product_name", "brand", "category"],
         key="today_entries_editor",
     )
 
@@ -753,6 +752,11 @@ def ba_today_entries() -> None:
                 new_value = row[field]
                 if field == "report_date":
                     new_value = str(new_value)
+                elif field == "report_type":
+                    new_value = str(new_value).strip().lower()
+                    if new_value not in REPORT_LABELS:
+                        st.error("Report type must be tester, damage, theft, or restock.")
+                        return
                 elif field == "qty":
                     new_value = int(new_value)
                 else:
