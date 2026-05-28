@@ -309,7 +309,9 @@ def secret_value(name: str, default=None):
 
 
 def use_supabase() -> bool:
-    return bool(secret_value("USE_SUPABASE", False)) and bool(secret_value("SUPABASE_URL")) and bool(secret_value("SUPABASE_KEY"))
+    key = str(secret_value("SUPABASE_KEY", "")).strip()
+    has_real_key = key.startswith(("eyJ", "sb_"))
+    return bool(secret_value("USE_SUPABASE", False)) and bool(secret_value("SUPABASE_URL")) and has_real_key
 
 
 def supabase_url() -> str:
@@ -323,15 +325,18 @@ def supabase_url() -> str:
 def supabase_client():
     from supabase import create_client
 
-    return create_client(supabase_url(), secret_value("SUPABASE_KEY"))
+    return create_client(supabase_url(), str(secret_value("SUPABASE_KEY", "")).strip())
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_products() -> pd.DataFrame:
     if use_supabase():
-        response = supabase_client().table("products").select("*").execute()
-        df = pd.DataFrame(response.data)
-        if df.empty and PRODUCT_CSV.exists():
+        try:
+            response = supabase_client().table("products").select("*").execute()
+            df = pd.DataFrame(response.data)
+            if df.empty and PRODUCT_CSV.exists():
+                df = pd.read_csv(PRODUCT_CSV, dtype=str)
+        except Exception:
             df = pd.read_csv(PRODUCT_CSV, dtype=str)
     else:
         df = pd.read_csv(PRODUCT_CSV, dtype=str)
