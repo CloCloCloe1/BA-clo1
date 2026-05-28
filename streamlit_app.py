@@ -18,6 +18,34 @@ REPORT_LABELS = {
     "theft": "Theft",
     "restock": "Restock",
 }
+EXPORT_COLUMNS = [
+    "date",
+    "ba_name",
+    "last6",
+    "full_barcode",
+    "product_name",
+    "brand",
+    "qty",
+    "category",
+    "store_name",
+    "location",
+    "report_type",
+    "notes",
+]
+EXPORT_RENAMES = {
+    "date": "Date",
+    "ba_name": "BA Name",
+    "last6": "Last6",
+    "full_barcode": "Full Barcode",
+    "product_name": "Product Name",
+    "brand": "Brand",
+    "qty": "Qty",
+    "category": "Category",
+    "store_name": "Store Name",
+    "location": "Location",
+    "report_type": "Report Type",
+    "notes": "Notes",
+}
 
 
 st.set_page_config(page_title="BA Consignment System", layout="wide")
@@ -78,6 +106,8 @@ def load_records() -> pd.DataFrame:
         "ba_name",
         "store_name",
         "input_code",
+        "last6",
+        "location",
         "qty",
         "barcode",
         "product_name",
@@ -89,11 +119,20 @@ def load_records() -> pd.DataFrame:
 
     if use_supabase():
         response = supabase_client().table("records").select("*").order("created_at", desc=True).execute()
-        return pd.DataFrame(response.data, columns=columns)
+        df = pd.DataFrame(response.data)
+    elif LOCAL_RECORDS_CSV.exists():
+        df = pd.read_csv(LOCAL_RECORDS_CSV, dtype=str).fillna("")
+    else:
+        df = pd.DataFrame(columns=columns)
 
-    if LOCAL_RECORDS_CSV.exists():
-        return pd.read_csv(LOCAL_RECORDS_CSV, dtype=str).fillna("")
-    return pd.DataFrame(columns=columns)
+    for col in columns:
+        if col not in df.columns:
+            df[col] = ""
+    df = df.fillna("")
+    if "last6" in df.columns:
+        df["last6"] = df["last6"].where(df["last6"].astype(str).str.len() > 0, df["input_code"].astype(str).str[-6:])
+        df["last6"] = df["last6"].where(df["last6"].astype(str).str.len() > 0, df["barcode"].astype(str).str[-6:])
+    return df[columns]
 
 
 def save_record(record: dict) -> None:
@@ -128,7 +167,7 @@ def get_users() -> dict:
     except Exception:
         return {
             "admin": {"password": "admin123", "role": "admin", "display_name": "Admin User"},
-            "ba": {"password": "ba123", "role": "ba", "display_name": "BA User", "store_name": "Miniso Test Store"},
+        "ba": {"password": "ba123", "role": "ba", "display_name": "BA User", "store_name": "Miniso Test Store", "location": "Front Display"},
         }
 
 
@@ -151,6 +190,7 @@ def login_screen() -> None:
             "role": user.get("role", "ba"),
             "display_name": user.get("display_name", username),
             "store_name": user.get("store_name", ""),
+            "location": user.get("location", ""),
         }
         st.rerun()
 
@@ -199,9 +239,10 @@ def record_page(products: pd.DataFrame) -> None:
         report_date = col2.date_input("Date", value=date.today())
         qty = col3.number_input("Qty", min_value=1, value=1, step=1)
 
-        col4, col5 = st.columns(2)
+        col4, col5, col6 = st.columns(3)
         ba_name = col4.text_input("BA name", value=user["display_name"])
         store_name = col5.text_input("Store", value=user.get("store_name", ""))
+        location = col6.text_input("Location", value=user.get("location", ""), placeholder="e.g. Front display, Aisle 2")
 
         code = st.text_input("Scan barcode or enter last 6")
         notes = st.text_area("Notes")
@@ -232,7 +273,9 @@ def record_page(products: pd.DataFrame) -> None:
             "report_date": str(report_date),
             "ba_name": ba_name.strip(),
             "store_name": store_name.strip(),
+            "location": location.strip(),
             "input_code": normalize_code(code),
+            "last6": selected_product["last6"],
             "qty": int(qty),
             "barcode": selected_product["barcode"],
             "product_name": selected_product["product_name"],
@@ -244,13 +287,27 @@ def record_page(products: pd.DataFrame) -> None:
         st.success("Record saved.")
 
 
+def records_for_export(records: pd.DataFrame) -> pd.DataFrame:
+    df = records.copy()
+    if df.empty:
+        return pd.DataFrame(columns=list(EXPORT_RENAMES.values()))
+    df["date"] = df["report_date"]
+    df["full_barcode"] = df["barcode"]
+    df["last6"] = df["last6"].where(df["last6"].astype(str).str.len() > 0, df["barcode"].astype(str).str[-6:])
+    df["report_type"] = df["report_type"].map(REPORT_LABELS).fillna(df["report_type"])
+    for col in EXPORT_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+    return df[EXPORT_COLUMNS].rename(columns=EXPORT_RENAMES)
+
+
 def export_workbook(records: pd.DataFrame) -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         for report_type, label in REPORT_LABELS.items():
             sheet = records[records["report_type"] == report_type].copy()
-            sheet.to_excel(writer, index=False, sheet_name=label)
-        records.to_excel(writer, index=False, sheet_name="All Records")
+            records_for_export(sheet).to_excel(writer, index=False, sheet_name=label)
+        records_for_export(records).to_excel(writer, index=False, sheet_name="All Records")
     return output.getvalue()
 
 
@@ -267,15 +324,33 @@ def admin_page() -> None:
         st.info("No BA records yet.")
         return
 
+    locations = sorted([loc for loc in records["location"].dropna().astype(str).unique().tolist() if loc])
+    location_options = ["All locations"] + locations
+    selected_location = st.selectbox("Location", location_options)
+    filtered_records = records if selected_location == "All locations" else records[records["location"] == selected_location]
+
     st.download_button(
-        "Export Excel",
-        data=export_workbook(records),
-        file_name=f"ba-consignment-export-{date.today()}.xlsx",
+        "Export selected location Excel",
+        data=export_workbook(filtered_records),
+        file_name=f"ba-consignment-{selected_location.lower().replace(' ', '-')}-{date.today()}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
 
-    st.dataframe(records, hide_index=True, use_container_width=True)
+    if locations:
+        with st.expander("Download each location separately"):
+            for loc in locations:
+                loc_records = records[records["location"] == loc]
+                st.download_button(
+                    f"Download {loc}",
+                    data=export_workbook(loc_records),
+                    file_name=f"ba-consignment-{loc.lower().replace(' ', '-')}-{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"download-{loc}",
+                    use_container_width=True,
+                )
+
+    st.dataframe(records_for_export(filtered_records), hide_index=True, use_container_width=True)
 
 
 def main() -> None:

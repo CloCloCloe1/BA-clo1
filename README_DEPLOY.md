@@ -72,6 +72,7 @@ password = "change-this-ba-password"
 role = "ba"
 display_name = "BA User"
 store_name = "Miniso Test Store"
+location = "Front Display"
 ```
 
 9. Click `Deploy`.
@@ -87,6 +88,7 @@ https://your-app-name.streamlit.app
 - BA enters tester/damage/theft/restock records
 - Search by barcode, last 6, product name, brand, or category
 - Admin sees all records
+- Admin can filter/download records by location
 - Admin exports one Excel file with four sheets:
   - Tester
   - Damage
