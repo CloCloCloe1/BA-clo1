@@ -9,7 +9,7 @@ This is the free/fast test version:
 ## Demo Accounts
 
 - BA: `ba / ba123`
-- Admin: `admin / admin123`
+- Admin: `admin / Nakama-clo1`
 
 For production, change these passwords in Streamlit Secrets.
 
@@ -61,9 +61,10 @@ This imports `data/products.csv`, which was extracted from the Miniso `Product M
 USE_SUPABASE = true
 SUPABASE_URL = "https://your-project.supabase.co"
 SUPABASE_KEY = "your-api-key"
+REGISTRATION_CODE = "change-this-ba-registration-code"
 
 [users.admin]
-password = "change-this-admin-password"
+password = "Nakama-clo1"
 role = "admin"
 display_name = "Admin User"
 
@@ -71,8 +72,8 @@ display_name = "Admin User"
 password = "change-this-ba-password"
 role = "ba"
 display_name = "BA User"
-store_name = "Miniso Test Store"
-location = "Front Display"
+store_name = "Miniso"
+location = "BRO"
 ```
 
 9. Click `Deploy`.
@@ -89,6 +90,7 @@ https://your-app-name.streamlit.app
 - Search by barcode, last 6, product name, brand, or category
 - Admin sees all records
 - Admin can filter/download records by location
+- BA can register accounts with the registration code
 - Admin exports one Excel file with four sheets:
   - Tester
   - Damage

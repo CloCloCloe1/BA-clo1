@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import os
 from datetime import date
 from io import BytesIO
 from pathlib import Path
@@ -12,6 +14,7 @@ import streamlit as st
 ROOT = Path(__file__).parent
 PRODUCT_CSV = ROOT / "data" / "products.csv"
 LOCAL_RECORDS_CSV = ROOT / "data" / "records_local.csv"
+LOCAL_USERS_CSV = ROOT / "data" / "ba_users_local.csv"
 REPORT_LABELS = {
     "tester": "Tester",
     "damage": "Damage",
@@ -392,6 +395,65 @@ def save_record(record: dict) -> None:
     records.to_csv(LOCAL_RECORDS_CSV, index=False, encoding="utf-8-sig")
 
 
+def hash_password(password: str, salt: str | None = None) -> tuple[str, str]:
+    salt = salt or os.urandom(16).hex()
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000).hex()
+    return digest, salt
+
+
+def verify_password(password: str, password_hash: str, salt: str) -> bool:
+    digest, _ = hash_password(password, salt)
+    return digest == password_hash
+
+
+def load_ba_users() -> pd.DataFrame:
+    columns = ["username", "password_hash", "salt", "display_name", "store_name", "location", "active", "created_at"]
+    if use_supabase():
+        response = supabase_client().table("ba_users").select("*").execute()
+        df = pd.DataFrame(response.data)
+    elif LOCAL_USERS_CSV.exists():
+        df = pd.read_csv(LOCAL_USERS_CSV, dtype=str).fillna("")
+    else:
+        df = pd.DataFrame(columns=columns)
+
+    for col in columns:
+        if col not in df.columns:
+            df[col] = ""
+    return df[columns].fillna("")
+
+
+def find_ba_user(username: str) -> dict | None:
+    users = load_ba_users()
+    matches = users[users["username"].str.lower() == username.lower()]
+    if matches.empty:
+        return None
+    user = matches.iloc[0].to_dict()
+    if str(user.get("active", "true")).lower() in {"false", "0", "no"}:
+        return None
+    return user
+
+
+def create_ba_user(username: str, password: str, display_name: str, store_name: str, location: str) -> None:
+    password_hash, salt = hash_password(password)
+    row = {
+        "username": username.lower(),
+        "password_hash": password_hash,
+        "salt": salt,
+        "display_name": display_name,
+        "store_name": store_name,
+        "location": location,
+        "active": True,
+    }
+    if use_supabase():
+        supabase_client().table("ba_users").insert(row).execute()
+        return
+
+    users = load_ba_users()
+    users = users[users["username"].str.lower() != username.lower()]
+    users = pd.concat([users, pd.DataFrame([row])], ignore_index=True)
+    users.to_csv(LOCAL_USERS_CSV, index=False, encoding="utf-8-sig")
+
+
 def normalize_code(value: str) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
 
@@ -413,36 +475,73 @@ def get_users() -> dict:
         return dict(st.secrets["users"])
     except Exception:
         return {
-            "admin": {"password": "admin123", "role": "admin", "display_name": "Admin User"},
-        "ba": {"password": "ba123", "role": "ba", "display_name": "BA User", "store_name": "Miniso Test Store", "location": "Front Display"},
+            "admin": {"password": "Nakama-clo1", "role": "admin", "display_name": "Admin User"},
+            "ba": {"password": "ba123", "role": "ba", "display_name": "BA User", "store_name": "Miniso", "location": "BRO"},
         }
 
 
 def login_screen() -> None:
     page_hero("BA Consignment", "A clean workspace for store reporting, product lookup, and admin exports.", "Sign in")
     st.markdown('<div class="login-card">', unsafe_allow_html=True)
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Sign in", use_container_width=True)
+    login_tab, register_tab = st.tabs(["Sign in", "Register BA"])
+    with login_tab:
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Sign in", use_container_width=True)
+
+    with register_tab:
+        with st.form("register_form"):
+            reg_code = st.text_input("Registration code", type="password")
+            new_username = st.text_input("New BA username")
+            display_name = st.text_input("BA name")
+            new_password = st.text_input("New password", type="password")
+            store_name = st.text_input("Store", placeholder="e.g. Miniso or TNT")
+            location = st.text_input("Location", placeholder="e.g. BRO or STL")
+            registered = st.form_submit_button("Create BA account", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted:
         users = get_users()
-        user = users.get(username.strip().lower())
-        if not user or user.get("password") != password:
+        clean_username = username.strip().lower()
+        user = users.get(clean_username)
+        if user and user.get("password") == password:
+            st.session_state.user = {
+                "username": clean_username,
+                "role": user.get("role", "ba"),
+                "display_name": user.get("display_name", username),
+                "store_name": user.get("store_name", ""),
+                "location": user.get("location", ""),
+            }
+            st.rerun()
+
+        ba_user = find_ba_user(clean_username)
+        if not ba_user or not verify_password(password, ba_user.get("password_hash", ""), ba_user.get("salt", "")):
             st.error("Username or password is incorrect.")
             return
         st.session_state.user = {
-            "username": username.strip().lower(),
-            "role": user.get("role", "ba"),
-            "display_name": user.get("display_name", username),
-            "store_name": user.get("store_name", ""),
-            "location": user.get("location", ""),
+            "username": clean_username,
+            "role": "ba",
+            "display_name": ba_user.get("display_name", clean_username),
+            "store_name": ba_user.get("store_name", ""),
+            "location": ba_user.get("location", ""),
         }
         st.rerun()
 
-    st.caption("Demo BA: ba / ba123   |   Demo Admin: admin / admin123")
+    if registered:
+        expected_code = str(secret_value("REGISTRATION_CODE", "NAKAMA-BA")).strip()
+        clean_username = new_username.strip().lower()
+        if reg_code.strip() != expected_code:
+            st.error("Registration code is incorrect.")
+        elif not clean_username or not display_name.strip() or not new_password:
+            st.error("Please enter username, BA name, and password.")
+        elif find_ba_user(clean_username) or clean_username in get_users():
+            st.error("This username already exists.")
+        else:
+            create_ba_user(clean_username, new_password, display_name.strip(), store_name.strip(), location.strip())
+            st.success("BA account created. You can sign in now.")
+
+    st.caption("Admin: admin / Nakama-clo1   |   Demo BA: ba / ba123")
 
 
 def logout_button() -> None:
@@ -489,8 +588,8 @@ def record_page(products: pd.DataFrame) -> None:
 
         col4, col5, col6 = st.columns(3)
         ba_name = col4.text_input("BA name", value=user["display_name"])
-        store_name = col5.text_input("Store", value=user.get("store_name", ""))
-        location = col6.text_input("Location", value=user.get("location", ""), placeholder="e.g. Front display, Aisle 2")
+        store_name = col5.text_input("Store", value=user.get("store_name", ""), placeholder="e.g. Miniso or TNT")
+        location = col6.text_input("Location", value=user.get("location", ""), placeholder="e.g. BRO or STL")
 
         code = st.text_input("Scan barcode or enter last 6")
         notes = st.text_area("Notes")

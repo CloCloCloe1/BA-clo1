@@ -28,6 +28,17 @@ create table if not exists records (
   created_at timestamptz default now()
 );
 
+create table if not exists ba_users (
+  username text primary key,
+  password_hash text not null,
+  salt text not null,
+  display_name text not null,
+  store_name text,
+  location text,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+
 create index if not exists idx_products_last6 on products(last6);
 create index if not exists idx_records_report_type on records(report_type);
 create index if not exists idx_records_location on records(location);
