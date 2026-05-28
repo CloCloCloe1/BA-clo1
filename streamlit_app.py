@@ -51,6 +51,207 @@ EXPORT_RENAMES = {
 st.set_page_config(page_title="BA Consignment System", layout="wide")
 
 
+def inject_css() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --app-bg: #f5f5f7;
+            --card-bg: rgba(255, 255, 255, 0.86);
+            --ink: #1d1d1f;
+            --muted: #6e6e73;
+            --line: rgba(0, 0, 0, 0.08);
+            --blue: #0071e3;
+            --green-bg: #e9f8ef;
+            --green-text: #147a3f;
+        }
+
+        .stApp {
+            background: var(--app-bg);
+            color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+        }
+
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"] {
+            display: none;
+        }
+
+        [data-testid="stSidebar"] {
+            background: rgba(255, 255, 255, 0.72);
+            border-right: 1px solid var(--line);
+            backdrop-filter: blur(18px);
+        }
+
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {
+            color: var(--ink);
+            font-size: 18px;
+            letter-spacing: 0;
+        }
+
+        .block-container {
+            max-width: 1180px;
+            padding-top: 42px;
+            padding-bottom: 56px;
+        }
+
+        h1, h2, h3 {
+            letter-spacing: 0;
+            color: var(--ink);
+        }
+
+        h1 {
+            font-size: 42px;
+            font-weight: 700;
+        }
+
+        h2 {
+            font-size: 30px;
+            font-weight: 700;
+        }
+
+        p, label, .stCaption {
+            color: var(--muted);
+        }
+
+        div[data-testid="stForm"],
+        div[data-testid="stMetric"],
+        div[data-testid="stDataFrame"],
+        div[data-testid="stExpander"] {
+            background: var(--card-bg);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.05);
+        }
+
+        div[data-testid="stForm"] {
+            padding: 24px;
+        }
+
+        div[data-testid="stMetric"] {
+            padding: 18px 18px 14px;
+        }
+
+        div[data-testid="stMetricLabel"] p {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        div[data-testid="stMetricValue"] {
+            color: var(--ink);
+            font-size: 30px;
+            font-weight: 650;
+        }
+
+        .stTextInput input,
+        .stNumberInput input,
+        .stDateInput input,
+        textarea,
+        div[data-baseweb="select"] > div {
+            background: rgba(255, 255, 255, 0.92) !important;
+            border: 1px solid var(--line) !important;
+            border-radius: 14px !important;
+            box-shadow: none !important;
+        }
+
+        .stTextInput input:focus,
+        .stNumberInput input:focus,
+        .stDateInput input:focus,
+        textarea:focus {
+            border-color: rgba(0, 113, 227, 0.55) !important;
+            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12) !important;
+        }
+
+        .stButton button,
+        .stDownloadButton button,
+        button[kind="primary"],
+        button[kind="secondary"] {
+            background: var(--blue) !important;
+            color: white !important;
+            border: 0 !important;
+            border-radius: 999px !important;
+            padding: 0.62rem 1.15rem !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
+        }
+
+        .stButton button:hover,
+        .stDownloadButton button:hover {
+            background: #0066cc !important;
+        }
+
+        div[data-testid="stAlert"] {
+            border-radius: 18px;
+            border: 0;
+        }
+
+        div[data-testid="stAlert"][kind="success"] {
+            background: var(--green-bg);
+            color: var(--green-text);
+        }
+
+        .app-hero {
+            margin-bottom: 24px;
+        }
+
+        .app-eyebrow {
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .app-title {
+            color: var(--ink);
+            font-size: 42px;
+            line-height: 1.08;
+            font-weight: 720;
+            margin-bottom: 8px;
+        }
+
+        .app-subtitle {
+            color: var(--muted);
+            font-size: 17px;
+            line-height: 1.45;
+            max-width: 720px;
+        }
+
+        .login-card {
+            max-width: 460px;
+            margin: 44px auto 0;
+        }
+
+        .product-pill {
+            background: var(--green-bg);
+            color: var(--green-text);
+            border-radius: 18px;
+            padding: 18px 20px;
+            font-weight: 600;
+            margin-top: 12px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def page_hero(title: str, subtitle: str, eyebrow: str | None = None) -> None:
+    eyebrow_html = f'<div class="app-eyebrow">{eyebrow}</div>' if eyebrow else ""
+    st.markdown(
+        f"""
+        <div class="app-hero">
+            {eyebrow_html}
+            <div class="app-title">{title}</div>
+            <div class="app-subtitle">{subtitle}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def secret_value(name: str, default=None):
     try:
         return st.secrets[name]
@@ -172,12 +373,13 @@ def get_users() -> dict:
 
 
 def login_screen() -> None:
-    st.title("BA Consignment Store System")
-    st.caption("Sign in with a BA or Admin account.")
+    page_hero("BA Consignment", "A clean workspace for store reporting, product lookup, and admin exports.", "Sign in")
+    st.markdown('<div class="login-card">', unsafe_allow_html=True)
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Sign in", use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted:
         users = get_users()
@@ -194,7 +396,7 @@ def login_screen() -> None:
         }
         st.rerun()
 
-    st.info("Demo BA: ba / ba123\n\nDemo Admin: admin / admin123")
+    st.caption("Demo BA: ba / ba123   |   Demo Admin: admin / admin123")
 
 
 def logout_button() -> None:
@@ -207,7 +409,7 @@ def logout_button() -> None:
 
 
 def search_page(products: pd.DataFrame) -> None:
-    st.header("Product Search")
+    page_hero("Product Search", "Find items by keyword, barcode, last 6, brand, or category.", "Master list")
     col1, col2 = st.columns([3, 1])
     query = col1.text_input("Search by keyword, barcode, last 6, brand, or category")
     categories = ["All"] + sorted([c for c in products["category"].dropna().unique().tolist() if c])
@@ -230,7 +432,7 @@ def search_page(products: pd.DataFrame) -> None:
 
 
 def record_page(products: pd.DataFrame) -> None:
-    st.header("BA Record")
+    page_hero("New Record", "Scan a barcode or enter the last 6 digits. Product details fill in automatically.", "BA input")
     user = st.session_state.user
 
     with st.form("record_form", clear_on_submit=False):
@@ -261,7 +463,14 @@ def record_page(products: pd.DataFrame) -> None:
                 format_func=lambda barcode: matches.loc[matches["barcode"] == barcode, "product_name"].iloc[0],
             )
             selected_product = matches[matches["barcode"] == selected_barcode].iloc[0].to_dict()
-            st.success(f"{selected_product['barcode']} | {selected_product['product_name']} | {selected_product['brand']}")
+            st.markdown(
+                f"""
+                <div class="product-pill">
+                    {selected_product['barcode']} &nbsp;|&nbsp; {selected_product['product_name']} &nbsp;|&nbsp; {selected_product['brand']}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     if submitted:
         if not selected_product:
@@ -312,7 +521,7 @@ def export_workbook(records: pd.DataFrame) -> bytes:
 
 
 def admin_page() -> None:
-    st.header("Admin Dashboard")
+    page_hero("Admin", "Review submissions, filter by location, and download Excel files.", "Operations")
     records = load_records()
 
     cols = st.columns(5)
@@ -354,8 +563,9 @@ def admin_page() -> None:
 
 
 def main() -> None:
+    inject_css()
     products = load_products()
-    st.sidebar.title("Consignment System")
+    st.sidebar.title("BA Consignment")
     st.sidebar.caption(f"{len(products):,} products loaded")
 
     if "user" not in st.session_state:
