@@ -12,7 +12,7 @@ DEFAULT_CSV = ROOT / "data" / "products.csv"
 
 def load_products(path: Path = DEFAULT_CSV) -> pd.DataFrame:
     df = pd.read_csv(path, dtype=str).fillna("")
-    required = ["barcode", "last6", "product_name", "brand", "category", "status", "msl", "max_qty"]
+    required = ["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]
     missing = [col for col in required if col not in df.columns]
     if missing:
         raise ValueError(f"Missing columns: {missing}")

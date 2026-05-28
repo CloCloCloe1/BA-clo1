@@ -88,7 +88,7 @@ https://your-app-name.streamlit.app
 - Miniso products only
 - BA enters tester/damage/theft/restock records
 - BA can review and edit their own records from today
-- Search by barcode, last 6, product name, brand, or category
+- Search by barcode, last 6, product name, or brand
 - Admin sees all records
 - Admin can filter/download records by location
 - BA can register accounts with the registration code

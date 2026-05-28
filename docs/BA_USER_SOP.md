@@ -75,7 +75,6 @@ Locked fields:
 - Full Barcode
 - Product Name
 - Brand
-- Category
 
 Product fields are locked to protect the product master data. If the wrong product was selected, submit a corrected record and notify Admin.
 
@@ -87,8 +86,7 @@ Product fields are locked to protect the product master data. If the wrong produ
    - Full barcode
    - Last 6 digits
    - Brand
-   - Category
-3. Use the category filter if needed.
+3. Review the search results and confirm the product before saving.
 
 ## Important Notes
 

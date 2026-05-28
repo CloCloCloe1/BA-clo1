@@ -86,11 +86,10 @@ The export uses this column order:
 5. Product Name
 6. Brand
 7. Qty
-8. Category
-9. Store Name
-10. Location
-11. Report Type
-12. Notes
+8. Store Name
+9. Location
+10. Report Type
+11. Notes
 
 ## Manage BA Accounts
 

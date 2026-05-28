@@ -3,7 +3,6 @@ create table if not exists products (
   last6 text,
   product_name text,
   brand text,
-  category text,
   status text,
   msl text,
   max_qty text,
@@ -24,7 +23,6 @@ create table if not exists records (
   barcode text,
   product_name text,
   brand text,
-  category text,
   notes text,
   created_at timestamptz default now()
 );

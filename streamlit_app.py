@@ -30,7 +30,6 @@ EXPORT_COLUMNS = [
     "product_name",
     "brand",
     "qty",
-    "category",
     "store_name",
     "location",
     "report_type",
@@ -44,7 +43,6 @@ EXPORT_RENAMES = {
     "product_name": "Product Name",
     "brand": "Brand",
     "qty": "Qty",
-    "category": "Category",
     "store_name": "Store Name",
     "location": "Location",
     "report_type": "Report Type",
@@ -343,15 +341,15 @@ def load_products() -> pd.DataFrame:
         df = pd.read_csv(PRODUCT_CSV, dtype=str)
 
     if df.empty:
-        return pd.DataFrame(columns=["barcode", "last6", "product_name", "brand", "category", "status", "msl", "max_qty"])
+        return pd.DataFrame(columns=["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"])
 
-    for col in ["barcode", "last6", "product_name", "brand", "category", "status", "msl", "max_qty"]:
+    for col in ["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]:
         if col not in df.columns:
             df[col] = ""
     df = df.fillna("")
     df["barcode"] = df["barcode"].astype(str)
     df["last6"] = df["barcode"].str[-6:]
-    return df[["barcode", "last6", "product_name", "brand", "category", "status", "msl", "max_qty"]]
+    return df[["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]]
 
 
 def load_records() -> pd.DataFrame:
@@ -369,7 +367,6 @@ def load_records() -> pd.DataFrame:
         "barcode",
         "product_name",
         "brand",
-        "category",
         "notes",
         "created_at",
     ]
@@ -575,23 +572,18 @@ def logout_button() -> None:
 
 
 def search_page(products: pd.DataFrame) -> None:
-    page_hero("Product Search", "Find items by keyword, barcode, last 6, brand, or category.", "Master list")
-    col1, col2 = st.columns([3, 1])
-    query = col1.text_input("Search by keyword, barcode, last 6, brand, or category")
-    categories = ["All"] + sorted([c for c in products["category"].dropna().unique().tolist() if c])
-    category = col2.selectbox("Category", categories)
+    page_hero("Product Search", "Find items by keyword, barcode, last 6, or brand.", "Master list")
+    query = st.text_input("Search by keyword, barcode, last 6, or brand")
 
     filtered = products.copy()
-    if category != "All":
-        filtered = filtered[filtered["category"] == category]
     if query.strip():
         q = query.strip().lower()
-        haystack = filtered[["barcode", "last6", "product_name", "brand", "category", "status"]].agg(" ".join, axis=1).str.lower()
+        haystack = filtered[["barcode", "last6", "product_name", "brand", "status"]].agg(" ".join, axis=1).str.lower()
         filtered = filtered[haystack.str.contains(q, na=False)]
 
     st.caption(f"{len(filtered)} matching products")
     st.dataframe(
-        filtered[["barcode", "last6", "product_name", "brand", "category", "status"]],
+        filtered[["barcode", "last6", "product_name", "brand", "status"]],
         hide_index=True,
         use_container_width=True,
     )
@@ -657,7 +649,6 @@ def record_page(products: pd.DataFrame) -> None:
             "barcode": selected_product["barcode"],
             "product_name": selected_product["product_name"],
             "brand": selected_product["brand"],
-            "category": selected_product["category"],
             "notes": notes.strip(),
         }
         save_record(record)
@@ -708,7 +699,6 @@ def ba_today_entries() -> None:
         "product_name",
         "brand",
         "qty",
-        "category",
         "store_name",
         "location",
         "notes",
@@ -729,12 +719,11 @@ def ba_today_entries() -> None:
             "product_name",
             "brand",
             "qty",
-            "category",
             "store_name",
             "location",
             "notes",
         ],
-        disabled=["id", "last6", "barcode", "product_name", "brand", "category"],
+        disabled=["id", "last6", "barcode", "product_name", "brand"],
         key="today_entries_editor",
     )
 

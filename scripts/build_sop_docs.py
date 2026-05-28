@@ -330,7 +330,7 @@ def build_ba_doc() -> None:
         doc,
         [
             ("Editable fields", "Date, Type, BA Name, Qty, Store, Location, Notes"),
-            ("Locked fields", "Last6, Full Barcode, Product Name, Brand, Category"),
+            ("Locked fields", "Last6, Full Barcode, Product Name, Brand"),
             ("Previous-day mistakes", "Contact Admin. BA users can only edit same-day records."),
         ],
         header=("Area", "Details"),
@@ -344,8 +344,8 @@ def build_ba_doc() -> None:
     add_bullets(
         doc,
         [
-            "Search by product keyword, full barcode, last 6 digits, brand, or category.",
-            "Use the category dropdown to narrow results.",
+            "Search by product keyword, full barcode, last 6 digits, or brand.",
+            "Review the search results and confirm the product before saving.",
             "Always confirm product name and brand before saving a record.",
         ],
     )
@@ -435,7 +435,6 @@ def build_admin_doc() -> None:
             "Product Name",
             "Brand",
             "Qty",
-            "Category",
             "Store Name",
             "Location",
             "Report Type",
