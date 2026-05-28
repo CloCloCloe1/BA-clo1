@@ -19,6 +19,7 @@ create table if not exists records (
   input_code text,
   last6 text,
   location text,
+  submitted_by text,
   qty integer not null,
   barcode text,
   product_name text,

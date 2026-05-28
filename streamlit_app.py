@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import time
 from datetime import date
 from io import BytesIO
 from pathlib import Path
@@ -363,6 +364,7 @@ def load_records() -> pd.DataFrame:
         "input_code",
         "last6",
         "location",
+        "submitted_by",
         "qty",
         "barcode",
         "product_name",
@@ -397,6 +399,20 @@ def save_record(record: dict) -> None:
 
     records = load_records()
     records = pd.concat([pd.DataFrame([record]), records], ignore_index=True)
+    records.to_csv(LOCAL_RECORDS_CSV, index=False, encoding="utf-8-sig")
+
+
+def update_record(record_id: str, changes: dict) -> None:
+    if use_supabase():
+        supabase_client().table("records").update(changes).eq("id", record_id).execute()
+        return
+
+    records = load_records()
+    mask = records["id"].astype(str) == str(record_id)
+    for key, value in changes.items():
+        if key not in records.columns:
+            records[key] = ""
+        records.loc[mask, key] = value
     records.to_csv(LOCAL_RECORDS_CSV, index=False, encoding="utf-8-sig")
 
 
@@ -584,6 +600,7 @@ def search_page(products: pd.DataFrame) -> None:
 def record_page(products: pd.DataFrame) -> None:
     page_hero("New Record", "Scan a barcode or enter the last 6 digits. Product details fill in automatically.", "BA input")
     user = st.session_state.user
+    save_flash = bool(st.session_state.get("save_flash", False))
 
     with st.form("record_form", clear_on_submit=False):
         col1, col2, col3 = st.columns(3)
@@ -598,7 +615,7 @@ def record_page(products: pd.DataFrame) -> None:
 
         code = st.text_input("Scan barcode or enter last 6")
         notes = st.text_area("Notes")
-        submitted = st.form_submit_button("Save record", use_container_width=True)
+        submitted = st.form_submit_button("Saved" if save_flash else "Save record", use_container_width=True, disabled=save_flash)
 
     matches = find_products(products, code)
     selected_product = None
@@ -633,6 +650,7 @@ def record_page(products: pd.DataFrame) -> None:
             "ba_name": ba_name.strip(),
             "store_name": store_name.strip(),
             "location": location.strip(),
+            "submitted_by": user["username"],
             "input_code": normalize_code(code),
             "last6": selected_product["last6"],
             "qty": int(qty),
@@ -643,7 +661,121 @@ def record_page(products: pd.DataFrame) -> None:
             "notes": notes.strip(),
         }
         save_record(record)
+        st.session_state.save_flash = True
+        st.rerun()
+
+    if save_flash:
         st.success("Record saved.")
+
+    ba_today_entries()
+
+    if save_flash:
+        time.sleep(1.5)
+        st.session_state.save_flash = False
+        st.rerun()
+
+
+def ba_today_entries() -> None:
+    user = st.session_state.user
+    records = load_records()
+    if records.empty:
+        return
+
+    today_text = str(date.today())
+    own_records = records[
+        (records["report_date"].astype(str) == today_text)
+        & (
+            (records["submitted_by"].astype(str) == user["username"])
+            | ((records["submitted_by"].astype(str) == "") & (records["ba_name"].astype(str) == user["display_name"]))
+        )
+    ].copy()
+
+    st.markdown("---")
+    st.subheader("Today's entries")
+    st.caption("You can edit today's records here. Product fields are locked to protect the master data.")
+
+    if own_records.empty:
+        st.info("No records saved today yet.")
+        return
+
+    display_cols = [
+        "id",
+        "report_date",
+        "report_type",
+        "ba_name",
+        "last6",
+        "barcode",
+        "product_name",
+        "brand",
+        "qty",
+        "category",
+        "store_name",
+        "location",
+        "notes",
+    ]
+    editor_df = own_records[display_cols].copy()
+    editor_df["qty"] = pd.to_numeric(editor_df["qty"], errors="coerce").fillna(1).astype(int)
+
+    edited = st.data_editor(
+        editor_df,
+        hide_index=True,
+        use_container_width=True,
+        disabled=["last6", "barcode", "product_name", "brand", "category"],
+        column_config={
+            "id": None,
+            "report_date": st.column_config.DateColumn("Date"),
+            "report_type": st.column_config.SelectboxColumn("Type", options=list(REPORT_LABELS.keys())),
+            "ba_name": "BA Name",
+            "last6": "Last6",
+            "barcode": "Full Barcode",
+            "product_name": "Product Name",
+            "brand": "Brand",
+            "qty": st.column_config.NumberColumn("Qty", min_value=1, step=1),
+            "category": "Category",
+            "store_name": "Store",
+            "location": "Location",
+            "notes": "Notes",
+        },
+        key="today_entries_editor",
+    )
+
+    if st.button("Save changes", use_container_width=True):
+        editable_fields = ["report_date", "report_type", "ba_name", "qty", "store_name", "location", "notes"]
+        updates = 0
+        original_by_id = editor_df.set_index("id")
+        for _, row in edited.iterrows():
+            record_id = str(row["id"])
+            if record_id not in original_by_id.index:
+                continue
+            changes = {}
+            original = original_by_id.loc[record_id]
+            for field in editable_fields:
+                new_value = row[field]
+                if field == "report_date":
+                    new_value = str(new_value)
+                elif field == "qty":
+                    new_value = int(new_value)
+                else:
+                    new_value = str(new_value).strip()
+
+                old_value = original[field]
+                if field == "qty":
+                    old_value = int(old_value)
+                else:
+                    old_value = str(old_value).strip()
+
+                if new_value != old_value:
+                    changes[field] = new_value
+            if changes:
+                update_record(record_id, changes)
+                updates += 1
+
+        if updates:
+            st.success(f"Updated {updates} record(s).")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.info("No changes to save.")
 
 
 def records_for_export(records: pd.DataFrame) -> pd.DataFrame:
