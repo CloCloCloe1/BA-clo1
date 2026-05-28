@@ -34,11 +34,18 @@ def use_supabase() -> bool:
     return bool(secret_value("USE_SUPABASE", False)) and bool(secret_value("SUPABASE_URL")) and bool(secret_value("SUPABASE_KEY"))
 
 
+def supabase_url() -> str:
+    url = str(secret_value("SUPABASE_URL", "")).strip().rstrip("/")
+    if url.endswith("/rest/v1"):
+        url = url[: -len("/rest/v1")]
+    return url
+
+
 @st.cache_resource(show_spinner=False)
 def supabase_client():
     from supabase import create_client
 
-    return create_client(secret_value("SUPABASE_URL"), secret_value("SUPABASE_KEY"))
+    return create_client(supabase_url(), secret_value("SUPABASE_KEY"))
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -46,6 +53,8 @@ def load_products() -> pd.DataFrame:
     if use_supabase():
         response = supabase_client().table("products").select("*").execute()
         df = pd.DataFrame(response.data)
+        if df.empty and PRODUCT_CSV.exists():
+            df = pd.read_csv(PRODUCT_CSV, dtype=str)
     else:
         df = pd.read_csv(PRODUCT_CSV, dtype=str)
 
