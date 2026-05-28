@@ -806,6 +806,16 @@ def export_workbook(records: pd.DataFrame) -> bytes:
     return output.getvalue()
 
 
+def slug(value: str) -> str:
+    clean = str(value or "").strip().lower()
+    for old, new in [(" ", "-"), ("/", "-"), ("\\", "-"), ("_", "-")]:
+        clean = clean.replace(old, new)
+    clean = "".join(ch for ch in clean if ch.isalnum() or ch == "-").strip("-")
+    while "--" in clean:
+        clean = clean.replace("--", "-")
+    return clean or "all"
+
+
 def admin_page() -> None:
     page_hero("Admin", "Review submissions, filter by location, and download Excel files.", "Operations")
     records = load_records()
@@ -819,29 +829,43 @@ def admin_page() -> None:
         st.info("No BA records yet.")
         return
 
-    locations = sorted([loc for loc in records["location"].dropna().astype(str).unique().tolist() if loc])
+    stores = sorted([store for store in records["store_name"].dropna().astype(str).unique().tolist() if store])
+    store_options = ["All stores"] + stores
+    selected_store = st.selectbox("Store", store_options)
+    store_filtered_records = records if selected_store == "All stores" else records[records["store_name"] == selected_store]
+
+    locations = sorted([loc for loc in store_filtered_records["location"].dropna().astype(str).unique().tolist() if loc])
     location_options = ["All locations"] + locations
     selected_location = st.selectbox("Location", location_options)
-    filtered_records = records if selected_location == "All locations" else records[records["location"] == selected_location]
+    filtered_records = (
+        store_filtered_records
+        if selected_location == "All locations"
+        else store_filtered_records[store_filtered_records["location"] == selected_location]
+    )
+
+    st.caption(f"{len(filtered_records)} records selected")
+
+    store_slug = "all-stores" if selected_store == "All stores" else slug(selected_store)
+    location_slug = "all-locations" if selected_location == "All locations" else slug(selected_location)
 
     st.download_button(
-        "Export selected location Excel",
+        "Export selected Excel",
         data=export_workbook(filtered_records),
-        file_name=f"ba-consignment-{selected_location.lower().replace(' ', '-')}-{date.today()}.xlsx",
+        file_name=f"ba-consignment-{store_slug}-{location_slug}-{date.today()}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
 
     if locations:
-        with st.expander("Download each location separately"):
+        with st.expander("Download each location separately for selected store"):
             for loc in locations:
-                loc_records = records[records["location"] == loc]
+                loc_records = store_filtered_records[store_filtered_records["location"] == loc]
                 st.download_button(
                     f"Download {loc}",
                     data=export_workbook(loc_records),
-                    file_name=f"ba-consignment-{loc.lower().replace(' ', '-')}-{date.today()}.xlsx",
+                    file_name=f"ba-consignment-{store_slug}-{slug(loc)}-{date.today()}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"download-{loc}",
+                    key=f"download-{selected_store}-{loc}",
                     use_container_width=True,
                 )
 
