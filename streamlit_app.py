@@ -326,7 +326,7 @@ def supabase_client():
     return create_client(supabase_url(), str(secret_value("SUPABASE_KEY", "")).strip())
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_products() -> pd.DataFrame:
     if use_supabase():
         try:
@@ -351,7 +351,7 @@ def load_products() -> pd.DataFrame:
     return df[["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]]
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_product_locations() -> pd.DataFrame:
     columns = ["barcode", "store_name", "planogram_location", "brand", "product_name"]
     if not use_supabase():
@@ -923,6 +923,9 @@ def main() -> None:
     products = load_products()
     st.sidebar.title("BA Consignment")
     st.sidebar.caption(f"{len(products):,} products loaded")
+    if st.sidebar.button("Refresh data", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
     if "user" not in st.session_state:
         login_screen()
