@@ -22,6 +22,7 @@ REPORT_LABELS = {
     "theft": "Theft",
     "restock": "Restock",
 }
+STORE_OPTIONS = ["STC", "Brossard", "St.Laurent"]
 EXPORT_COLUMNS = [
     "date",
     "ba_name",
@@ -31,7 +32,6 @@ EXPORT_COLUMNS = [
     "brand",
     "qty",
     "store_name",
-    "location",
     "report_type",
     "notes",
 ]
@@ -44,7 +44,6 @@ EXPORT_RENAMES = {
     "brand": "Brand",
     "qty": "Qty",
     "store_name": "Store Name",
-    "location": "Location",
     "report_type": "Report Type",
     "notes": "Notes",
 }
@@ -352,6 +351,49 @@ def load_products() -> pd.DataFrame:
     return df[["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]]
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def load_product_locations() -> pd.DataFrame:
+    columns = ["barcode", "store_name", "planogram_location", "brand", "product_name"]
+    if not use_supabase():
+        return pd.DataFrame(columns=columns)
+
+    try:
+        response = supabase_client().table("product_locations").select("*").execute()
+        df = pd.DataFrame(response.data)
+    except Exception:
+        df = pd.DataFrame(columns=columns)
+
+    for col in columns:
+        if col not in df.columns:
+            df[col] = ""
+    df = df.fillna("")
+    df["barcode"] = df["barcode"].astype(str)
+    df["store_name"] = df["store_name"].astype(str)
+    return df[columns]
+
+
+def products_for_store(products: pd.DataFrame, store_name: str) -> pd.DataFrame:
+    locations = load_product_locations()
+    store_locations = locations[locations["store_name"].astype(str) == str(store_name)].copy()
+    if store_locations.empty:
+        df = products.copy()
+        df["planogram_location"] = ""
+        return df
+
+    store_locations = store_locations[["barcode", "planogram_location"]].drop_duplicates("barcode")
+    df = products.merge(store_locations, how="inner", on="barcode")
+    for col in ["planogram_location"]:
+        if col not in df.columns:
+            df[col] = ""
+    return df
+
+
+def default_store(value: str | None = None) -> str:
+    if value in STORE_OPTIONS:
+        return str(value)
+    return STORE_OPTIONS[0]
+
+
 def load_records() -> pd.DataFrame:
     columns = [
         "id",
@@ -494,7 +536,7 @@ def get_users() -> dict:
     except Exception:
         return {
             "admin": {"password": "Nakama-clo1", "role": "admin", "display_name": "Admin User"},
-            "ba": {"password": "ba123", "role": "ba", "display_name": "BA User", "store_name": "Miniso", "location": "BRO"},
+            "ba": {"password": "ba123", "role": "ba", "display_name": "BA User", "store_name": "STC", "location": ""},
         }
 
 
@@ -514,8 +556,7 @@ def login_screen() -> None:
             new_username = st.text_input("New BA username")
             display_name = st.text_input("BA name")
             new_password = st.text_input("New password", type="password")
-            store_name = st.text_input("Store", placeholder="e.g. Miniso or TNT")
-            location = st.text_input("Location", placeholder="e.g. BRO or STL")
+            store_name = st.selectbox("Store", STORE_OPTIONS)
             registered = st.form_submit_button("Create BA account", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -528,8 +569,8 @@ def login_screen() -> None:
                 "username": clean_username,
                 "role": user.get("role", "ba"),
                 "display_name": user.get("display_name", username),
-                "store_name": user.get("store_name", ""),
-                "location": user.get("location", ""),
+                "store_name": default_store(user.get("store_name", "")),
+                "location": "",
             }
             st.rerun()
 
@@ -541,8 +582,8 @@ def login_screen() -> None:
             "username": clean_username,
             "role": "ba",
             "display_name": ba_user.get("display_name", clean_username),
-            "store_name": ba_user.get("store_name", ""),
-            "location": ba_user.get("location", ""),
+            "store_name": default_store(ba_user.get("store_name", "")),
+            "location": "",
         }
         st.rerun()
 
@@ -556,7 +597,7 @@ def login_screen() -> None:
         elif find_ba_user(clean_username) or clean_username in get_users():
             st.error("This username already exists.")
         else:
-            create_ba_user(clean_username, new_password, display_name.strip(), store_name.strip(), location.strip())
+            create_ba_user(clean_username, new_password, display_name.strip(), store_name.strip(), "")
             st.success("BA account created. You can sign in now.")
 
     st.caption("Admin: admin / Nakama-clo1   |   Demo BA: ba / ba123")
@@ -572,18 +613,34 @@ def logout_button() -> None:
 
 
 def search_page(products: pd.DataFrame) -> None:
-    page_hero("Product Search", "Find items by keyword, barcode, last 6, or brand.", "Master list")
+    page_hero("Product Search", "Find items by keyword, barcode, last 6, brand, or planogram location.", "Master list")
+    user = st.session_state.user
+    selected_store = st.selectbox(
+        "Store",
+        STORE_OPTIONS,
+        index=STORE_OPTIONS.index(default_store(user.get("store_name", ""))),
+        key="search_store",
+    )
     query = st.text_input("Search by keyword, barcode, last 6, or brand")
 
-    filtered = products.copy()
+    filtered = products_for_store(products, selected_store)
+    has_store_dataset = filtered["planogram_location"].astype(str).str.len().gt(0).any()
+    if not has_store_dataset:
+        st.info(f"No planogram dataset has been loaded for {selected_store} yet. Search will use the product master list.")
+
     if query.strip():
         q = query.strip().lower()
-        haystack = filtered[["barcode", "last6", "product_name", "brand", "status"]].agg(" ".join, axis=1).str.lower()
+        haystack = (
+            filtered[["barcode", "last6", "product_name", "brand", "planogram_location", "status"]]
+            .astype(str)
+            .agg(" ".join, axis=1)
+            .str.lower()
+        )
         filtered = filtered[haystack.str.contains(q, na=False)]
 
     st.caption(f"{len(filtered)} matching products")
     st.dataframe(
-        filtered[["barcode", "last6", "product_name", "brand", "status"]],
+        filtered[["barcode", "last6", "product_name", "brand", "planogram_location", "status"]],
         hide_index=True,
         use_container_width=True,
     )
@@ -600,16 +657,21 @@ def record_page(products: pd.DataFrame) -> None:
         report_date = col2.date_input("Date", value=date.today())
         qty = col3.number_input("Qty", min_value=1, value=1, step=1)
 
-        col4, col5, col6 = st.columns(3)
+        col4, col5 = st.columns(2)
         ba_name = col4.text_input("BA name", value=user["display_name"])
-        store_name = col5.text_input("Store", value=user.get("store_name", ""), placeholder="e.g. Miniso or TNT")
-        location = col6.text_input("Location", value=user.get("location", ""), placeholder="e.g. BRO or STL")
+        store_name = col5.selectbox(
+            "Store",
+            STORE_OPTIONS,
+            index=STORE_OPTIONS.index(default_store(user.get("store_name", ""))),
+            key="record_store",
+        )
 
         code = st.text_input("Scan barcode or enter last 6")
         notes = st.text_area("Notes")
         submitted = st.form_submit_button("Saved" if save_flash else "Save record", use_container_width=True, disabled=save_flash)
 
-    matches = find_products(products, code)
+    store_products = products_for_store(products, store_name)
+    matches = find_products(store_products, code)
     selected_product = None
     if code:
         if matches.empty:
@@ -622,10 +684,13 @@ def record_page(products: pd.DataFrame) -> None:
                 format_func=lambda barcode: matches.loc[matches["barcode"] == barcode, "product_name"].iloc[0],
             )
             selected_product = matches[matches["barcode"] == selected_barcode].iloc[0].to_dict()
+            planogram_text = str(selected_product.get("planogram_location", "")).strip()
+            planogram_line = f"<br><strong>Planogram Location:</strong> {planogram_text}" if planogram_text else ""
             st.markdown(
                 f"""
                 <div class="product-pill">
                     {selected_product['barcode']} &nbsp;|&nbsp; {selected_product['product_name']} &nbsp;|&nbsp; {selected_product['brand']}
+                    {planogram_line}
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -641,7 +706,7 @@ def record_page(products: pd.DataFrame) -> None:
             "report_date": str(report_date),
             "ba_name": ba_name.strip(),
             "store_name": store_name.strip(),
-            "location": location.strip(),
+            "location": "",
             "submitted_by": user["username"],
             "input_code": normalize_code(code),
             "last6": selected_product["last6"],
@@ -700,7 +765,6 @@ def ba_today_entries() -> None:
         "brand",
         "qty",
         "store_name",
-        "location",
         "notes",
     ]
     editor_df = own_records[display_cols].copy()
@@ -720,15 +784,18 @@ def ba_today_entries() -> None:
             "brand",
             "qty",
             "store_name",
-            "location",
             "notes",
         ],
         disabled=["id", "last6", "barcode", "product_name", "brand"],
+        column_config={
+            "report_type": st.column_config.SelectboxColumn("report_type", options=list(REPORT_LABELS.keys())),
+            "store_name": st.column_config.SelectboxColumn("store_name", options=STORE_OPTIONS),
+        },
         key="today_entries_editor",
     )
 
     if st.button("Save changes", use_container_width=True):
-        editable_fields = ["report_date", "report_type", "ba_name", "qty", "store_name", "location", "notes"]
+        editable_fields = ["report_date", "report_type", "ba_name", "qty", "store_name", "notes"]
         updates = 0
         original_by_id = editor_df.set_index("id")
         for _, row in edited.iterrows():
@@ -806,7 +873,7 @@ def slug(value: str) -> str:
 
 
 def admin_page() -> None:
-    page_hero("Admin", "Review submissions, filter by location, and download Excel files.", "Operations")
+    page_hero("Admin", "Review submissions, filter by store, and download Excel files.", "Operations")
     records = load_records()
 
     cols = st.columns(5)
@@ -818,43 +885,33 @@ def admin_page() -> None:
         st.info("No BA records yet.")
         return
 
-    stores = sorted([store for store in records["store_name"].dropna().astype(str).unique().tolist() if store])
+    stores = sorted(set(STORE_OPTIONS + [store for store in records["store_name"].dropna().astype(str).unique().tolist() if store]))
     store_options = ["All stores"] + stores
     selected_store = st.selectbox("Store", store_options)
-    store_filtered_records = records if selected_store == "All stores" else records[records["store_name"] == selected_store]
-
-    locations = sorted([loc for loc in store_filtered_records["location"].dropna().astype(str).unique().tolist() if loc])
-    location_options = ["All locations"] + locations
-    selected_location = st.selectbox("Location", location_options)
-    filtered_records = (
-        store_filtered_records
-        if selected_location == "All locations"
-        else store_filtered_records[store_filtered_records["location"] == selected_location]
-    )
+    filtered_records = records if selected_store == "All stores" else records[records["store_name"] == selected_store]
 
     st.caption(f"{len(filtered_records)} records selected")
 
     store_slug = "all-stores" if selected_store == "All stores" else slug(selected_store)
-    location_slug = "all-locations" if selected_location == "All locations" else slug(selected_location)
 
     st.download_button(
         "Export selected Excel",
         data=export_workbook(filtered_records),
-        file_name=f"ba-consignment-{store_slug}-{location_slug}-{date.today()}.xlsx",
+        file_name=f"ba-consignment-{store_slug}-{date.today()}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
 
-    if locations:
-        with st.expander("Download each location separately for selected store"):
-            for loc in locations:
-                loc_records = store_filtered_records[store_filtered_records["location"] == loc]
+    if stores and selected_store == "All stores":
+        with st.expander("Download each store separately"):
+            for store in stores:
+                store_records = records[records["store_name"] == store]
                 st.download_button(
-                    f"Download {loc}",
-                    data=export_workbook(loc_records),
-                    file_name=f"ba-consignment-{store_slug}-{slug(loc)}-{date.today()}.xlsx",
+                    f"Download {store}",
+                    data=export_workbook(store_records),
+                    file_name=f"ba-consignment-{slug(store)}-{date.today()}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"download-{selected_store}-{loc}",
+                    key=f"download-{store}",
                     use_container_width=True,
                 )
 

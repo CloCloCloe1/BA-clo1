@@ -27,6 +27,16 @@ create table if not exists records (
   created_at timestamptz default now()
 );
 
+create table if not exists product_locations (
+  barcode text not null,
+  store_name text not null,
+  planogram_location text not null,
+  brand text,
+  product_name text,
+  updated_at timestamptz default now(),
+  primary key (barcode, store_name)
+);
+
 create table if not exists ba_users (
   username text primary key,
   password_hash text not null,
@@ -40,5 +50,7 @@ create table if not exists ba_users (
 
 create index if not exists idx_products_last6 on products(last6);
 create index if not exists idx_records_report_type on records(report_type);
-create index if not exists idx_records_location on records(location);
+create index if not exists idx_records_store_name on records(store_name);
 create index if not exists idx_records_created_at on records(created_at);
+create index if not exists idx_product_locations_store on product_locations(store_name);
+create index if not exists idx_product_locations_barcode on product_locations(barcode);
