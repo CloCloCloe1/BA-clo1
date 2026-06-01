@@ -956,7 +956,7 @@ def main() -> None:
     logout_button()
     role = st.session_state.user["role"]
     pages = ["Search", "Admin"] if role == "admin" else ["Record", "Search"]
-    page = st.sidebar.radio("Navigation", pages)
+    page = st.radio("Navigation", pages, horizontal=True, label_visibility="collapsed")
 
     if page == "Record":
         record_page(products)
