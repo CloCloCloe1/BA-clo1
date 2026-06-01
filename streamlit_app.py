@@ -23,6 +23,23 @@ REPORT_LABELS = {
     "restock": "Restock",
 }
 STORE_OPTIONS = ["STC", "Brossard", "St.Laurent"]
+PLANOGRAM_COLUMNS = {
+    "STC": "stc_planogram_location",
+    "Brossard": "brossard_planogram_location",
+    "St.Laurent": "st_laurent_planogram_location",
+}
+PRODUCT_COLUMNS = [
+    "barcode",
+    "last6",
+    "product_name",
+    "brand",
+    "status",
+    "msl",
+    "max_qty",
+    "stc_planogram_location",
+    "brossard_planogram_location",
+    "st_laurent_planogram_location",
+]
 EXPORT_COLUMNS = [
     "date",
     "ba_name",
@@ -340,15 +357,15 @@ def load_products() -> pd.DataFrame:
         df = pd.read_csv(PRODUCT_CSV, dtype=str)
 
     if df.empty:
-        return pd.DataFrame(columns=["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"])
+        return pd.DataFrame(columns=PRODUCT_COLUMNS)
 
-    for col in ["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]:
+    for col in PRODUCT_COLUMNS:
         if col not in df.columns:
             df[col] = ""
     df = df.fillna("")
     df["barcode"] = df["barcode"].astype(str)
     df["last6"] = df["barcode"].str[-6:]
-    return df[["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]]
+    return df[PRODUCT_COLUMNS]
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -373,13 +390,18 @@ def load_product_locations() -> pd.DataFrame:
 
 
 def products_for_store(products: pd.DataFrame, store_name: str) -> pd.DataFrame:
+    df = products.copy()
+    store_column = PLANOGRAM_COLUMNS.get(str(store_name), "")
+    if store_column and store_column in df.columns:
+        df["planogram_location"] = df[store_column].fillna("").astype(str)
+        if df["planogram_location"].str.len().gt(0).any():
+            return df
+
     locations = load_product_locations()
     store_locations = locations[locations["store_name"].astype(str) == str(store_name)].copy()
     if store_locations.empty:
-        df = products.copy()
         df["planogram_location"] = ""
         return df
-
     store_locations = store_locations[["barcode", "planogram_location"]].drop_duplicates("barcode")
     df = products.merge(store_locations, how="inner", on="barcode")
     for col in ["planogram_location"]:

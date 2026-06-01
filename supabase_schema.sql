@@ -6,6 +6,9 @@ create table if not exists products (
   status text,
   msl text,
   max_qty text,
+  stc_planogram_location text,
+  brossard_planogram_location text,
+  st_laurent_planogram_location text,
   updated_at timestamptz default now()
 );
 

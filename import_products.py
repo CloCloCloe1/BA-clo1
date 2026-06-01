@@ -12,10 +12,21 @@ DEFAULT_CSV = ROOT / "data" / "products.csv"
 
 def load_products(path: Path = DEFAULT_CSV) -> pd.DataFrame:
     df = pd.read_csv(path, dtype=str).fillna("")
-    required = ["barcode", "last6", "product_name", "brand", "status", "msl", "max_qty"]
+    required = [
+        "barcode",
+        "last6",
+        "product_name",
+        "brand",
+        "status",
+        "msl",
+        "max_qty",
+        "stc_planogram_location",
+        "brossard_planogram_location",
+        "st_laurent_planogram_location",
+    ]
     missing = [col for col in required if col not in df.columns]
-    if missing:
-        raise ValueError(f"Missing columns: {missing}")
+    for col in missing:
+        df[col] = ""
     df["barcode"] = df["barcode"].str.replace(r"\D", "", regex=True)
     df["last6"] = df["barcode"].str[-6:]
     return df[required].drop_duplicates("barcode")
