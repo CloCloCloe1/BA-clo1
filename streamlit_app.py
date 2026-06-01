@@ -402,11 +402,12 @@ def products_for_store(products: pd.DataFrame, store_name: str) -> pd.DataFrame:
     if store_locations.empty:
         df["planogram_location"] = ""
         return df
-    store_locations = store_locations[["barcode", "planogram_location"]].drop_duplicates("barcode")
-    df = products.merge(store_locations, how="inner", on="barcode")
-    for col in ["planogram_location"]:
-        if col not in df.columns:
-            df[col] = ""
+    store_locations["location_last6"] = store_locations["barcode"].astype(str).str[-6:]
+    by_barcode = dict(zip(store_locations["barcode"].astype(str), store_locations["planogram_location"].astype(str)))
+    by_last6 = dict(zip(store_locations["location_last6"].astype(str), store_locations["planogram_location"].astype(str)))
+    df["planogram_location"] = df["barcode"].astype(str).map(by_barcode).fillna("")
+    missing_location = df["planogram_location"].eq("")
+    df.loc[missing_location, "planogram_location"] = df.loc[missing_location, "last6"].astype(str).map(by_last6).fillna("")
     return df
 
 
