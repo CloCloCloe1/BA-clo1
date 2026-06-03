@@ -57,3 +57,114 @@ create index if not exists idx_records_store_name on records(store_name);
 create index if not exists idx_records_created_at on records(created_at);
 create index if not exists idx_product_locations_store on product_locations(store_name);
 create index if not exists idx_product_locations_barcode on product_locations(barcode);
+
+alter table public.products enable row level security;
+alter table public.records enable row level security;
+alter table public.product_locations enable row level security;
+alter table public.ba_users enable row level security;
+
+drop policy if exists "Allow anon read products" on public.products;
+drop policy if exists "Allow anon insert products" on public.products;
+drop policy if exists "Allow anon update products" on public.products;
+drop policy if exists "Allow anon delete products" on public.products;
+
+create policy "Allow anon read products"
+on public.products for select
+to anon, authenticated
+using (true);
+
+create policy "Allow anon insert products"
+on public.products for insert
+to anon, authenticated
+with check (true);
+
+create policy "Allow anon update products"
+on public.products for update
+to anon, authenticated
+using (true)
+with check (true);
+
+create policy "Allow anon delete products"
+on public.products for delete
+to anon, authenticated
+using (true);
+
+drop policy if exists "Allow anon read records" on public.records;
+drop policy if exists "Allow anon insert records" on public.records;
+drop policy if exists "Allow anon update records" on public.records;
+drop policy if exists "Allow anon delete records" on public.records;
+
+create policy "Allow anon read records"
+on public.records for select
+to anon, authenticated
+using (true);
+
+create policy "Allow anon insert records"
+on public.records for insert
+to anon, authenticated
+with check (true);
+
+create policy "Allow anon update records"
+on public.records for update
+to anon, authenticated
+using (true)
+with check (true);
+
+create policy "Allow anon delete records"
+on public.records for delete
+to anon, authenticated
+using (true);
+
+drop policy if exists "Allow anon read product locations" on public.product_locations;
+drop policy if exists "Allow anon insert product locations" on public.product_locations;
+drop policy if exists "Allow anon update product locations" on public.product_locations;
+drop policy if exists "Allow anon delete product locations" on public.product_locations;
+
+create policy "Allow anon read product locations"
+on public.product_locations for select
+to anon, authenticated
+using (true);
+
+create policy "Allow anon insert product locations"
+on public.product_locations for insert
+to anon, authenticated
+with check (true);
+
+create policy "Allow anon update product locations"
+on public.product_locations for update
+to anon, authenticated
+using (true)
+with check (true);
+
+create policy "Allow anon delete product locations"
+on public.product_locations for delete
+to anon, authenticated
+using (true);
+
+drop policy if exists "Allow anon read ba users" on public.ba_users;
+drop policy if exists "Allow anon insert ba users" on public.ba_users;
+drop policy if exists "Allow anon update ba users" on public.ba_users;
+drop policy if exists "Allow anon delete ba users" on public.ba_users;
+
+create policy "Allow anon read ba users"
+on public.ba_users for select
+to anon, authenticated
+using (true);
+
+create policy "Allow anon insert ba users"
+on public.ba_users for insert
+to anon, authenticated
+with check (true);
+
+create policy "Allow anon update ba users"
+on public.ba_users for update
+to anon, authenticated
+using (true)
+with check (true);
+
+create policy "Allow anon delete ba users"
+on public.ba_users for delete
+to anon, authenticated
+using (true);
+
+notify pgrst, 'reload schema';

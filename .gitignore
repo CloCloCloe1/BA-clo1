@@ -2,3 +2,4 @@
 data/records_local.csv
 __pycache__/
 *.pyc
+docs/render_*/

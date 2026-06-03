@@ -1,10 +1,10 @@
-# Miniso BA Consignment MVP
+# BA Consignment App
 
 This is the free/fast test version:
 
 - GitHub: stores this code
 - Streamlit Community Cloud: hosts the URL
-- Supabase Free: optional backend database for shared products and records
+- Supabase Free: backend database for shared products, BA records, BA users, and planogram locations
 
 ## Demo Accounts
 
@@ -32,9 +32,10 @@ python -m streamlit run streamlit_app.py
 1. Create a free Supabase project.
 2. Open `SQL Editor`.
 3. Paste and run `supabase_schema.sql`.
-4. Copy your Project URL and API key.
+4. Import `data/products.csv` into the `products` table, or use `import_products.py`.
+5. Copy your Project URL and API key.
 
-## Import Miniso Product Master To Supabase
+## Import Product Master To Supabase
 
 Set environment variables:
 
@@ -45,6 +46,12 @@ python import_products.py
 ```
 
 This imports `data/products.csv`, which was extracted from the Miniso `Product Master` sheet.
+
+If planogram locations were imported into `product_locations` first, run `supabase_merge_planogram_into_products.sql` after import. It copies the store planogram values into the product master columns:
+
+- `stc_planogram_location`
+- `brossard_planogram_location`
+- `st_laurent_planogram_location`
 
 ## Streamlit Cloud Deploy
 
@@ -72,8 +79,7 @@ display_name = "Admin User"
 password = "change-this-ba-password"
 role = "ba"
 display_name = "BA User"
-store_name = "Miniso"
-location = "BRO"
+store_name = "STC"
 ```
 
 9. Click `Deploy`.
@@ -83,14 +89,15 @@ location = "BRO"
 https://your-app-name.streamlit.app
 ```
 
-## First MVP Scope
+## Current Scope
 
-- Miniso products only
 - BA enters tester/damage/theft/restock records
 - BA can review and edit their own records from today
-- Search by barcode, last 6, product name, or brand
+- BA chooses a store from `STC`, `Brossard`, and `St.Laurent`
+- Search by barcode, last 6, product name, brand, or planogram location
+- Search and record pages show planogram location when available
 - Admin sees all records
-- Admin can filter/download records by location
+- Admin can filter/download records by store
 - BA can register accounts with the registration code
 - Admin exports one Excel file with four sheets:
   - Tester
@@ -101,7 +108,5 @@ https://your-app-name.streamlit.app
 ## Later Upgrade
 
 - Admin upload new master list
-- Multiple customers: Miniso, TNT, others
-- Multiple stores per customer
 - Import batches and active/inactive master lists
 - One account per BA
